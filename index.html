@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>YOLOv8 Defect Detection</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f9fafb;
+      color: #111827;
+      margin: 0;
+      padding: 30px;
+    }
+
+    #mainCard {
+      max-width: 960px;
+      margin: auto;
+      background: white;
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      font-size: 28px;
+      color: #1f2937;
+    }
+
+    #modeSelector {
+      padding: 12px 16px;
+      font-size: 16px;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      margin-top: 10px;
+      background-color: #ffffff;
+      color: #1f2937;
+      cursor: pointer;
+      transition: border 0.3s ease;
+    }
+    
+    #modeSelector:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+
+
+    #uploadContainer {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-top: 20px;
+    }
+
+
+    #fileInput {
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    .preview-container {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    video, img {
+      max-width: 45%;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transition: opacity 0.4s ease;
+      transform: scaleX(-1);
+    }
+
+    canvas {
+      display: none;
+    }
+
+    #resultContainer {
+      margin-top: 20px;
+    }
+
+    .statusText {
+      margin-top: 15px;
+      font-size: 16px;
+      color: #2563eb;
+      font-weight: 500;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #3b82f6;
+      border-radius: 50%;
+      width: 42px;
+      height: 42px;
+      animation: spin 0.8s ease-in-out infinite;
+      margin: 30px auto;
+      
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div id="mainCard">
+    <h1>Defect Detection</h1>
+
+    <select id="modeSelector">
+      <option value="" disabled selected>Select Mode</option>
+      <option value="webcam">Live Webcam</option>
+      <option value="image">Static Image</option>
+      <option value="video">Video Upload</option>
+    </select>
+
+    <div id="uploadContainer" style="display: none;">
+      <input type="file" id="fileInput" accept="image/*,video/*" />
+    </div>
+
+    <div class="preview-container">
+      <video id="video" autoplay playsinline muted style="display:none"></video>
+      <img id="resultImage" style="display:none" />
+    </div>
+
+  <div id="spinner" class="spinner" style="display: none;"></div>
+  <div id="spinnerMessage" class="statusText" style="display: none;">Processing video, please wait...</div>
+
+
+
+    <canvas id="canvas"></canvas>
+    <div id="resultContainer"></div>
+  </div>
+
+  <script>
+    const modeSelector = document.getElementById("modeSelector");
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const resultImage = document.getElementById("resultImage");
+    const uploadContainer = document.getElementById("uploadContainer");
+    const fileInput = document.getElementById("fileInput");
+    const resultContainer = document.getElementById("resultContainer");
+    const ctx = canvas.getContext("2d");
+
+    let ws = null;
+
+    function resetUI() {
+      video.style.display = "none";
+      resultImage.style.display = "none";
+      resultImage.classList.remove("visible");
+      uploadContainer.style.display = "none";
+      resultContainer.innerHTML = "";
+      fileInput.value = "";
+    }
+
+    function stopWebcam() {
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+      }
+      if (ws) {
+        ws.close();
+        ws = null;
+      }
+    }
+
+    function startWebcam() {
+      resetUI();
+      video.style.display = "block";
+
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then((stream) => {
+          video.srcObject = stream;
+
+          ws = new WebSocket("ws://localhost:8000/ws");
+
+          ws.onopen = () => {
+            console.log("WebSocket connected");
+            sendFrames();
+          };
+
+          ws.onmessage = (event) => {
+            resultImage.src = event.data;
+            resultImage.style.display = "block";
+            resultImage.classList.add("visible");
+          };
+        })
+        .catch((err) => {
+          console.error("Webcam error:", err);
+          alert("Could not access webcam.");
+        });
+    }
+
+    function sendFrames() {
+      const interval = setInterval(() => {
+        if (!ws || ws.readyState !== 1 || !video.srcObject) {
+          clearInterval(interval);
+          return;
+        }
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg");
+        ws.send(dataUrl);
+      }, 200);
+    }
+
+    function showSpinner() {
+      const spinner = document.getElementById("spinner");
+      if (spinner) spinner.style.display = "block";
+    }
+    
+    function hideSpinner() {
+      const spinner = document.getElementById("spinner");
+      if (spinner) spinner.style.display = "none";
+    }
+    
+
+    modeSelector.addEventListener("change", () => {
+      const mode = modeSelector.value;
+      stopWebcam();
+      resetUI();
+
+      if (mode === "webcam") {
+        startWebcam();
+      } else {
+        uploadContainer.style.display = "block";
+      }
+    });
+
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+
+      const mode = modeSelector.value;
+      resultContainer.innerHTML = "";
+
+      if (mode === "image") {
+        const reader = new FileReader();
+        reader.onload = () => {
+          showSpinner();
+          fetch("http://localhost:8000/image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image: reader.result })
+          })
+            .then(res => res.json())
+            .then(data => {
+              hideSpinner();
+              resultImage.src = data.annotated;
+              resultImage.style.display = "block";
+              resultImage.classList.add("visible");
+            })
+            .catch(err => {
+              hideSpinner();
+              console.error("Image upload error:", err);
+              alert("Failed to process image.");
+            });
+          
+        };
+        reader.readAsDataURL(file);
+      }
+
+      else if (mode === "video") {
+        const formData = new FormData();
+        formData.append("file", file);
+      
+        showSpinner();
+      
+        fetch("http://localhost:8000/video", {
+          method: "POST",
+          body: formData
+        })
+          .then(res => res.json())
+          .then(data => {
+            hideSpinner();
+            resultContainer.innerHTML = "";
+      
+            const resultVideo = document.createElement("video");
+            resultVideo.src = data.video;
+            resultVideo.controls = true;
+            resultVideo.setAttribute("playsinline", "");
+            resultVideo.setAttribute("muted", "");
+            resultVideo.setAttribute("autoplay", "");
+            resultVideo.style.maxWidth = "80%";
+            resultVideo.style.marginTop = "15px";
+            resultVideo.style.borderRadius = "12px";
+            resultVideo.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
+      
+            resultVideo.load();
+      
+            resultVideo.addEventListener("canplay", () => {
+              resultVideo.play().catch(err => {
+                console.warn("Autoplay prevented. Click to play manually.");
+              });
+            });
+      
+            resultContainer.appendChild(resultVideo);
+          })
+          .catch(err => {
+            hideSpinner();
+            console.error("Video upload error:", err);
+            resultContainer.innerHTML = "Failed to process video.";
+          });
+      }
+      
+    });
+  </script>
+</body>
+</html>
