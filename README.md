@@ -22,13 +22,15 @@ A real-time web-based Quality Control (QC) system using YOLOv8 for detecting fab
 
 1. **Clone the repo**:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/yolo-defect-detection-demo.git
-   cd yolo-defect-detection-demo
+   git clone https://github.com/YOUR_USERNAME/QC-Automation.git
+   cd QC-Automation
 
 2. **Install dependencies**:
-
+```
 pip install -r requirements.txt
+```
 
 3. **Run the server**:
-
+```
 uvicorn main:app --reload
+```
