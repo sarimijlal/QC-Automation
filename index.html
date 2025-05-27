@@ -42,12 +42,11 @@
       cursor: pointer;
       transition: border 0.3s ease;
     }
-    
+
     #modeSelector:focus {
       outline: none;
       border-color: #3b82f6;
     }
-
 
     #uploadContainer {
       display: flex;
@@ -56,13 +55,19 @@
       margin-top: 20px;
     }
 
-
     #fileInput {
-      padding: 10px;
-      border-radius: 6px;
+      padding: 12px 20px;
+      border-radius: 8px;
       border: 1px solid #ccc;
+      background-color: #f1f5f9;
+      font-size: 15px;
       cursor: pointer;
-      margin-top: 10px;
+      transition: all 0.3s ease;
+    }
+
+    #fileInput:hover {
+      background-color: #e0e7ff;
+      border-color: #3b82f6;
     }
 
     .preview-container {
@@ -105,7 +110,6 @@
       height: 42px;
       animation: spin 0.8s ease-in-out infinite;
       margin: 30px auto;
-      
     }
 
     @keyframes spin {
@@ -134,10 +138,8 @@
       <img id="resultImage" style="display:none" />
     </div>
 
-  <div id="spinner" class="spinner" style="display: none;"></div>
-  <div id="spinnerMessage" class="statusText" style="display: none;">Processing video, please wait...</div>
-
-
+    <div id="spinner" class="spinner" style="display: none;"></div>
+    <div id="spinnerMessage" class="statusText" style="display: none;"></div>
 
     <canvas id="canvas"></canvas>
     <div id="resultContainer"></div>
@@ -151,9 +153,31 @@
     const uploadContainer = document.getElementById("uploadContainer");
     const fileInput = document.getElementById("fileInput");
     const resultContainer = document.getElementById("resultContainer");
+    const spinner = document.getElementById("spinner");
+    const spinnerMessage = document.getElementById("spinnerMessage");
     const ctx = canvas.getContext("2d");
 
     let ws = null;
+
+    function showStatus(message) {
+      spinnerMessage.innerText = message;
+      spinnerMessage.style.display = "block";
+    }
+
+    function hideStatus() {
+      spinnerMessage.innerText = "";
+      spinnerMessage.style.display = "none";
+    }
+
+    function showSpinner() {
+      spinner.style.display = "block";
+      showStatus("Processing...");
+    }
+
+    function hideSpinner() {
+      spinner.style.display = "none";
+      hideStatus();
+    }
 
     function resetUI() {
       video.style.display = "none";
@@ -162,6 +186,7 @@
       uploadContainer.style.display = "none";
       resultContainer.innerHTML = "";
       fileInput.value = "";
+      hideSpinner();
     }
 
     function stopWebcam() {
@@ -217,17 +242,6 @@
       }, 200);
     }
 
-    function showSpinner() {
-      const spinner = document.getElementById("spinner");
-      if (spinner) spinner.style.display = "block";
-    }
-    
-    function hideSpinner() {
-      const spinner = document.getElementById("spinner");
-      if (spinner) spinner.style.display = "none";
-    }
-    
-
     modeSelector.addEventListener("change", () => {
       const mode = modeSelector.value;
       stopWebcam();
@@ -237,6 +251,7 @@
         startWebcam();
       } else {
         uploadContainer.style.display = "block";
+        showStatus("Waiting for input...");
       }
     });
 
@@ -256,19 +271,19 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ image: reader.result })
           })
-            .then(res => res.json())
-            .then(data => {
-              hideSpinner();
-              resultImage.src = data.annotated;
-              resultImage.style.display = "block";
-              resultImage.classList.add("visible");
-            })
-            .catch(err => {
-              hideSpinner();
-              console.error("Image upload error:", err);
-              alert("Failed to process image.");
-            });
-          
+          .then(res => res.json())
+          .then(data => {
+            hideSpinner();
+            resultImage.src = data.annotated;
+            resultImage.style.display = "block";
+            resultImage.classList.add("visible");
+            showStatus("Detection complete.");
+          })
+          .catch(err => {
+            hideSpinner();
+            console.error("Image upload error:", err);
+            alert("Failed to process image.");
+          });
         };
         reader.readAsDataURL(file);
       }
@@ -276,46 +291,43 @@
       else if (mode === "video") {
         const formData = new FormData();
         formData.append("file", file);
-      
         showSpinner();
-      
+
         fetch("http://localhost:8000/video", {
           method: "POST",
           body: formData
         })
-          .then(res => res.json())
-          .then(data => {
-            hideSpinner();
-            resultContainer.innerHTML = "";
-      
-            const resultVideo = document.createElement("video");
-            resultVideo.src = data.video;
-            resultVideo.controls = true;
-            resultVideo.setAttribute("playsinline", "");
-            resultVideo.setAttribute("muted", "");
-            resultVideo.setAttribute("autoplay", "");
-            resultVideo.style.maxWidth = "80%";
-            resultVideo.style.marginTop = "15px";
-            resultVideo.style.borderRadius = "12px";
-            resultVideo.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
-      
-            resultVideo.load();
-      
-            resultVideo.addEventListener("canplay", () => {
-              resultVideo.play().catch(err => {
-                console.warn("Autoplay prevented. Click to play manually.");
-              });
+        .then(res => res.json())
+        .then(data => {
+          hideSpinner();
+          showStatus("Detection complete.");
+          const resultVideo = document.createElement("video");
+          resultVideo.src = data.video;
+          resultVideo.controls = true;
+          resultVideo.setAttribute("playsinline", "");
+          resultVideo.setAttribute("muted", "");
+          resultVideo.setAttribute("autoplay", "");
+          resultVideo.style.maxWidth = "80%";
+          resultVideo.style.marginTop = "15px";
+          resultVideo.style.borderRadius = "12px";
+          resultVideo.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
+
+          resultVideo.load();
+          resultVideo.addEventListener("canplay", () => {
+            resultVideo.play().catch(err => {
+              console.warn("Autoplay prevented. Click to play manually.");
             });
-      
-            resultContainer.appendChild(resultVideo);
-          })
-          .catch(err => {
-            hideSpinner();
-            console.error("Video upload error:", err);
-            resultContainer.innerHTML = "Failed to process video.";
           });
+
+          resultContainer.innerHTML = "";
+          resultContainer.appendChild(resultVideo);
+        })
+        .catch(err => {
+          hideSpinner();
+          console.error("Video upload error:", err);
+          resultContainer.innerHTML = "Failed to process video.";
+        });
       }
-      
     });
   </script>
 </body>
