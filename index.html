@@ -258,7 +258,10 @@
         .then((stream) => {
           video.srcObject = stream;
 
-          ws = new WebSocket("ws://localhost:8000/ws");
+          const protocol = location.protocol === "https:" ? "wss" : "ws";
+          const wsUrl = `${protocol}://${location.host}/ws`;
+          ws = new WebSocket(wsUrl);
+
 
           ws.onopen = () => {
             console.log("WebSocket connected");
