@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: yolo-defect-detection
+    env: python
+    plan: free
+    buildCommand: ""
+    startCommand: ./start.sh
+    envVars:
+      - key: UVICORN_CMD
+        value: "main:app"
+    autoDeploy: true
