@@ -19,6 +19,7 @@ app = FastAPI()
 
 
 app.mount("/annotated_videos", StaticFiles(directory=ANNOTATED_DIR), name="annotated_videos")
+app.mount("/", StaticFiles(directory=".", html=True), name="static")
 
 # Allow all CORS for development
 app.add_middleware(
@@ -135,7 +136,7 @@ async def process_video(file: UploadFile = File(...)):
 from fastapi.responses import FileResponse
 import os
 
-@app.get("/")
-def root():
-    file_path = os.path.join(os.path.dirname(__file__), "index.html")
-    return FileResponse(file_path)
+# @app.get("/")
+# def root():
+#     file_path = os.path.join(os.path.dirname(__file__), "index.html")
+#     return FileResponse(file_path)
