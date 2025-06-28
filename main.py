@@ -1,7 +1,7 @@
 import base64, os, uuid, shutil, cv2
 import numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, UploadFile, File
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from ultralytics import YOLO
@@ -19,7 +19,12 @@ app = FastAPI()
 
 
 app.mount("/annotated_videos", StaticFiles(directory=ANNOTATED_DIR), name="annotated_videos")
-app.mount("/", StaticFiles(directory=".", html=True), name="static")
+app.mount("/static", StaticFiles(directory=".", html=True), name="static")
+# app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+def root():
+    return FileResponse("index.html")
 
 # Allow all CORS for development
 app.add_middleware(
@@ -133,10 +138,3 @@ async def process_video(file: UploadFile = File(...)):
     video_url = f"http://localhost:8000/{output_path.replace(os.sep, '/')}"
     return {"video": video_url}
 
-from fastapi.responses import FileResponse
-import os
-
-# @app.get("/")
-# def root():
-#     file_path = os.path.join(os.path.dirname(__file__), "index.html")
-#     return FileResponse(file_path)
